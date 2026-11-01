@@ -1,0 +1,105 @@
+rules_version = '2';
+
+// =============================================================
+// منصة ساعد — قواعد الأمان (Firestore Security Rules)
+// الصقها في: Firebase Console → Firestore Database → Rules → Publish
+// القاعدة: الزائر بيقرا البيانات العامة بس، والأدمن بس اللي بيكتب
+// =============================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // الأدمن = حساب ليه مستند في admins بنفس الـ UID بتاعه (بيتضاف من الـ Console بس)
+    function isAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    match /admins/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // ---------- بيانات عامة: أي حد يقراها، والأدمن بس يكتبها ----------
+    match /catalog/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /public_index/{govId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    // فيها مقدمي الخدمة المعتمدين بس (اللي اتوقف بيتشال منها أوتوماتيك)
+    match /public_providers/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /public/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    // الصور مضغوطة (أقل من 1MB للمستند)
+    match /photos/{key} {
+      allow read: if true;
+      allow create, update: if isAdmin()
+        && request.resource.data.data is string
+        && request.resource.data.data.size() < 900000;
+      allow delete: if isAdmin();
+    }
+
+    // ---------- بيانات خاصة: الأدمن بس ----------
+    // (فيها السن والملاحظات ورسالة الواتساب الأصلية — محدش تاني يشوفها)
+    match /providers/{id} {
+      allow read, write: if isAdmin();
+    }
+    match /ads/{id} {
+      allow read, write: if isAdmin();
+    }
+
+    // ---------- البلاغات: الزائر يضيف بس، ومينفعش يقرا أو يعدّل ----------
+    match /reports/{id} {
+      allow create: if request.resource.data.keys().hasOnly(['provider_id', 'reason', 'details', 'contact', 'status', 'created_at'])
+        && request.resource.data.provider_id is string
+        && exists(/databases/$(database)/documents/public_providers/$(request.resource.data.provider_id))
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() >= 2
+        && request.resource.data.reason.size() <= 120
+        && request.resource.data.details is string
+        && request.resource.data.details.size() <= 1000
+        && request.resource.data.contact is string
+        && request.resource.data.contact.size() <= 30
+        && request.resource.data.status == 'new'
+        && request.resource.data.created_at == request.time;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // ---------- عدّادات الإحصائيات ----------
+    // الزائر يقدر يزوّد عدّاد واحد بـ 1 بس في كل مرة — مينفعش يكتب أرقام من عنده
+    match /counters/{id} {
+      function counts() {
+        return ['views', 'profile_views', 'whatsapp', 'call', 'share', 'ad_click'];
+      }
+      function plusOneOrSame(k) {
+        return request.resource.data.get(k, 0) == resource.data.get(k, 0)
+          || request.resource.data.get(k, 0) == resource.data.get(k, 0) + 1;
+      }
+      function validNew() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['date', 'dim', 'ref'].concat(counts()))
+          && d.keys().size() == 4
+          && d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+          && d.dim in ['all', 'p', 'c', 'l', 'a']
+          && d.ref is string && d.ref.size() <= 40
+          && id == d.date + '__' + d.dim + '__' + d.ref
+          && d.get('views', 1) == 1 && d.get('profile_views', 1) == 1 && d.get('whatsapp', 1) == 1
+          && d.get('call', 1) == 1 && d.get('share', 1) == 1 && d.get('ad_click', 1) == 1;
+      }
+
+      allow create: if validNew();
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(counts())
+        && request.resource.data.diff(resource.data).affectedKeys().size() == 1
+        && plusOneOrSame('views') && plusOneOrSame('profile_views') && plusOneOrSame('whatsapp')
+        && plusOneOrSame('call') && plusOneOrSame('share') && plusOneOrSame('ad_click');
+      allow read, delete: if isAdmin();
+    }
+  }
+}

@@ -1,0 +1,63 @@
+# بيبني الموقع وينشره على GitHub Pages مع كل push على main، وكل 6 ساعات
+# (عشان صفحات مقدمي الخدمة الجداد تظهر في جوجل والمشاركة)، أو يدوي من تبويب Actions
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '23 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      # الصور اللي اتنزلت من Firestore قبل كده (عشان منقراهاش تاني كل مرة)
+      - uses: actions/cache@v4
+        with:
+          path: .photo-cache
+          key: photos-${{ github.run_id }}
+          restore-keys: photos-
+      # اسم المستودع (github.event.repository مش موجود في التشغيل المجدول، فبناخده من GITHUB_REPOSITORY)
+      - run: |
+          echo "REPO_NAME=${GITHUB_REPOSITORY#*/}" >> "$GITHUB_ENV"
+          echo "OWNER_LC=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
+      - run: npm run build
+        env:
+          # إعدادات Firebase بتاعة مشروع saed-app-eg — مش سرية (أي موقع Firebase بيبعتها للمتصفح)، والحماية في firestore.rules.
+          # لو حطيت Variables بنفس الأسماء في GitHub هي اللي هتتاخد
+          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY || 'AIzaSyDuNYUzfnbtsq6dbkszLxMpNcw-tgPjTPs' }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN || 'saed-app-eg.firebaseapp.com' }}
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID || 'saed-app-eg' }}
+          VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID || '1:970528892962:web:179bda66a4bd1f4158427b' }}
+          # الموقع بيبقى على username.github.io/اسم-المستودع — ولو عندك دومين خاص حط VITE_BASE=/ و VITE_SITE_URL في Variables
+          VITE_BASE: ${{ vars.VITE_BASE || format('/{0}/', env.REPO_NAME) }}
+          VITE_SITE_URL: ${{ vars.VITE_SITE_URL || format('https://{0}.github.io/{1}/', env.OWNER_LC, env.REPO_NAME) }}
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
