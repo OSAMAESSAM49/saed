@@ -1,7 +1,12 @@
+import { createContext, useContext } from 'react'
 import { Link } from 'react-router-dom'
 import { BrandMark } from '../components/Logo.jsx'
 import { ArrowRight } from 'lucide-react'
 import { SITE } from '../config.js'
+
+// صلاحية اللي عامل دخول: 'owner' (صاحب الموقع) أو 'moderator' (مشرف)
+export const RoleContext = createContext('owner')
+export const useIsOwner = () => useContext(RoleContext) === 'owner'
 
 // الشريط اللي فوق في كل صفحات الأدمن
 export function AdminTop({ title, back, children }) {

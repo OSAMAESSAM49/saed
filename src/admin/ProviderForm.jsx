@@ -14,6 +14,7 @@ import { CategoryIcon } from '../lib/icons.jsx'
 import { Avatar } from '../components/ui.jsx'
 import { ProviderCard } from '../components/ProviderCard.jsx'
 import { getProviderById, saveProvider, slugTaken, deleteProvider } from './adminApi.js'
+import { useIsOwner } from './shared.jsx'
 
 const today = () => new Date().toISOString().slice(0, 10)
 const randomSuffix = () => Math.random().toString(36).slice(2, 6)
@@ -42,6 +43,7 @@ export function ProviderForm() {
   const { id } = useParams()
   const navigate = useNavigate()
   const catalog = useCatalog()
+  const isOwner = useIsOwner()
   const [form, setForm] = useState(EMPTY)
   const [loading, setLoading] = useState(!!id)
   const [paste, setPaste] = useState('')
@@ -476,7 +478,12 @@ export function ProviderForm() {
 
       <div className="save-bar">
         {error && <div className="err-note spacer">{error}</div>}
-        {id && (
+        {!error && form.updated_by && (
+          <small className="muted spacer" style={{ fontSize: 13 }}>
+            آخر تعديل: <span dir="ltr">{form.updated_by}</span>
+          </small>
+        )}
+        {id && isOwner && (
           <button
             className="btn btn-danger"
             disabled={saving}

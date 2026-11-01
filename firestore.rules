@@ -3,26 +3,44 @@ rules_version = '2';
 // =============================================================
 // منصة ساعد — قواعد الأمان (Firestore Security Rules)
 // الصقها في: Firebase Console → Firestore Database → Rules → Publish
-// القاعدة: الزائر بيقرا البيانات العامة بس، والأدمن بس اللي بيكتب
+// القاعدة: الزائر بيقرا البيانات العامة بس، والإدارة بس اللي بتكتب
+// الإدارة نوعين: صاحب الموقع (owner) بيعمل كل حاجة،
+// والمشرف (moderator) بيضيف ويعدّل ويوقف مقدمي الخدمة ويراجع البلاغات بس
 // =============================================================
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // الأدمن = حساب ليه مستند في admins بنفس الـ UID بتاعه (بيتضاف من الـ Console بس)
+    // الإدارة = حساب ليه مستند في admins بنفس الـ UID بتاعه
     function isAdmin() {
       return request.auth != null
         && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
+    // صاحب الموقع (role: owner) — بيتعمل من الـ Console بس
+    function isOwner() {
+      return isAdmin()
+        && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'owner';
+    }
 
+    // صاحب الموقع بيضيف ويشيل مشرفين من اللوحة، ومحدش يقدر يعمل owner جديد أو يمسحه من هنا
     match /admins/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
-      allow write: if false;
+      allow read: if request.auth != null && (request.auth.uid == uid || isOwner());
+      function validModerator() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['email', 'name', 'role', 'added_at', 'added_by'])
+          && d.role == 'moderator'
+          && d.email is string && d.email.size() <= 120
+          && d.name is string && d.name.size() <= 60;
+      }
+      allow create: if isOwner() && validModerator();
+      allow update: if isOwner() && resource.data.role == 'moderator' && validModerator();
+      allow delete: if isOwner() && resource.data.role == 'moderator';
     }
 
     // ---------- بيانات عامة: أي حد يقراها، والأدمن بس يكتبها ----------
+    // الفئات والأماكن: صاحب الموقع بس
     match /catalog/{docId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isOwner();
     }
     match /public_index/{govId} {
       allow read: if true;
@@ -33,26 +51,33 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isAdmin();
     }
+    // الإعلانات المنشورة: صاحب الموقع بس
     match /public/{docId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isOwner();
     }
     // الصور مضغوطة (أقل من 1MB للمستند)
+    // صور الإعلانات (ad_...) لصاحب الموقع بس
     match /photos/{key} {
+      function canEdit() {
+        return key.matches('ad_.*') ? isOwner() : isAdmin();
+      }
       allow read: if true;
-      allow create, update: if isAdmin()
+      allow create, update: if canEdit()
         && request.resource.data.data is string
         && request.resource.data.data.size() < 900000;
-      allow delete: if isAdmin();
+      allow delete: if canEdit();
     }
 
     // ---------- بيانات خاصة: الأدمن بس ----------
     // (فيها السن والملاحظات ورسالة الواتساب الأصلية — محدش تاني يشوفها)
+    // المشرف يضيف ويعدّل ويوقف، والمسح النهائي لصاحب الموقع بس
     match /providers/{id} {
-      allow read, write: if isAdmin();
+      allow read, create, update: if isAdmin();
+      allow delete: if isOwner();
     }
     match /ads/{id} {
-      allow read, write: if isAdmin();
+      allow read, write: if isOwner();
     }
 
     // ---------- البلاغات: الزائر يضيف بس، ومينفعش يقرا أو يعدّل ----------
@@ -69,7 +94,8 @@ service cloud.firestore {
         && request.resource.data.contact.size() <= 30
         && request.resource.data.status == 'new'
         && request.resource.data.created_at == request.time;
-      allow read, update, delete: if isAdmin();
+      allow read, update: if isAdmin();
+      allow delete: if isOwner();
     }
 
     // ---------- عدّادات الإحصائيات ----------
@@ -99,7 +125,8 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().size() == 1
         && plusOneOrSame('views') && plusOneOrSame('profile_views') && plusOneOrSame('whatsapp')
         && plusOneOrSame('call') && plusOneOrSame('share') && plusOneOrSame('ad_click');
-      allow read, delete: if isAdmin();
+      // الإحصائيات لصاحب الموقع بس
+      allow read, delete: if isOwner();
     }
   }
 }

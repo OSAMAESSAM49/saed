@@ -34,11 +34,20 @@ export async function getSession() {
   return auth.currentUser
 }
 
+// بيرجّع 'owner' (صاحب الموقع) أو 'moderator' (مشرف) أو null لو الحساب مش من الإدارة
 export async function checkAdmin() {
-  if (IS_DEMO) return true
+  if (IS_DEMO) return 'owner'
   const { db, auth, doc, getDoc } = await fb()
-  if (!auth.currentUser) return false
-  return (await getDoc(doc(db, 'admins', auth.currentUser.uid))).exists()
+  if (!auth.currentUser) return null
+  const snap = await getDoc(doc(db, 'admins', auth.currentUser.uid))
+  return snap.exists() ? (snap.data().role === 'owner' ? 'owner' : 'moderator') : null
+}
+
+// إيميل اللي عامل دخول (بيتسجّل على مقدم الخدمة عشان تعرف مين عدّل)
+async function editorEmail() {
+  if (IS_DEMO) return 'demo'
+  const { auth } = await fb()
+  return auth.currentUser?.email || null
 }
 
 export async function signIn(email, password) {
@@ -200,7 +209,11 @@ export async function saveProvider(form, photo = null) {
     photoFields = { photo_key: null, photo_v: null, photo_ext: null }
   }
   const { photo_url, ...rest } = form
-  await publish({ ...rest, ...photoFields, id, created_at: previous?.created_at || nowISO(), updated_at: nowISO() }, previous)
+  const by = await editorEmail()
+  await publish(
+    { ...rest, ...photoFields, id, created_at: previous?.created_at || nowISO(), created_by: previous ? previous.created_by || null : by, updated_at: nowISO(), updated_by: by },
+    previous,
+  )
   return { id }
 }
 
@@ -212,7 +225,7 @@ export async function setProviderStatus(id, status) {
     return saveProviders(list)
   }
   const previous = await getProviderById(id)
-  await publish({ ...previous, status, updated_at: nowISO() }, previous)
+  await publish({ ...previous, status, updated_at: nowISO(), updated_by: await editorEmail() }, previous)
 }
 
 // مسح نهائي (من كل الأماكن + الصورة)
@@ -367,4 +380,40 @@ export async function getAdminStats(days = 30) {
   const { db, collection, query, where, getDocs } = await fb()
   const snap = await getDocs(query(collection(db, 'counters'), where('date', '>=', sinceDate)))
   return aggregate(snap.docs.map((d) => d.data()))
+}
+
+// ---------- المشرفين (صاحب الموقع بس) ----------
+const DEMO_STAFF = 'saed.demo.staff'
+const loadDemoStaff = () => {
+  try {
+    return JSON.parse(localStorage.getItem(DEMO_STAFF)) || []
+  } catch {
+    return []
+  }
+}
+
+export async function listStaff() {
+  if (IS_DEMO) return [{ uid: 'demo', email: 'demo@saed', name: 'إنت', role: 'owner' }, ...loadDemoStaff()]
+  const { db, collection, getDocs } = await fb()
+  const snap = await getDocs(collection(db, 'admins'))
+  return snap.docs
+    .map((d) => ({ uid: d.id, name: '', ...d.data() }))
+    .sort((a, b) => (a.role === 'owner' ? -1 : b.role === 'owner' ? 1 : String(a.added_at).localeCompare(String(b.added_at))))
+}
+
+export async function addModerator({ uid, email, name }) {
+  uid = uid.trim()
+  if (!/^[A-Za-z0-9]{20,40}$/.test(uid)) throw new Error('الـ UID شكله غلط — انسخه تاني من Firebase (عمود User UID)')
+  const row = { email: email.trim().toLowerCase(), name: name.trim(), role: 'moderator', added_at: nowISO(), added_by: await editorEmail() }
+  if (IS_DEMO) return localStorage.setItem(DEMO_STAFF, JSON.stringify([...loadDemoStaff().filter((m) => m.uid !== uid), { uid, ...row }]))
+  const { db, doc, getDoc, setDoc } = await fb()
+  const existing = await getDoc(doc(db, 'admins', uid))
+  if (existing.exists() && existing.data().role === 'owner') throw new Error('الحساب ده صاحب الموقع أصلاً')
+  await setDoc(doc(db, 'admins', uid), row)
+}
+
+export async function removeModerator(uid) {
+  if (IS_DEMO) return localStorage.setItem(DEMO_STAFF, JSON.stringify(loadDemoStaff().filter((m) => m.uid !== uid)))
+  const { db, doc, deleteDoc } = await fb()
+  await deleteDoc(doc(db, 'admins', uid))
 }

@@ -7,11 +7,13 @@ import { normalizeAr, arNum } from '../lib/arabic.js'
 import { Avatar, Verified, Empty, Toast, useToast } from '../components/ui.jsx'
 import { listProviders, setProviderStatus, deleteProvider } from './adminApi.js'
 import { SITE } from '../config.js'
+import { useIsOwner } from './shared.jsx'
 
 const STATUS = { active: 'نشط', pending: 'مراجعة', suspended: 'موقوف' }
 
 export function ProvidersList({ onLogout }) {
   const catalog = useCatalog()
+  const isOwner = useIsOwner()
   const [reload, setReload] = useState(0)
   const { data, loading, error } = useAsync(listProviders, [reload])
   const [q, setQ] = useState('')
@@ -91,7 +93,7 @@ export function ProvidersList({ onLogout }) {
           </div>
         </div>
 
-        {demoOnes.length > 0 && (
+        {isOwner && demoOnes.length > 0 && (
           <div className="ok-note row" style={{ marginBottom: 12, flexWrap: 'wrap' }}>
             <span className="spacer">فيه {arNum(demoOnes.length)} مقدم خدمة تجريبي بأرقام وهمية. امسحهم قبل ما تعلن عن الموقع.</span>
             <button className="btn btn-sm btn-primary" onClick={removeDemo}>
