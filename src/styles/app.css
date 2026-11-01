@@ -504,6 +504,8 @@ button.stat-tile { border: 0; font: inherit; text-align: start; cursor: pointer;
 .footer { margin-top: 40px; padding-block: 26px 30px; color: var(--ink-3); font-size: 14px; }
 .footer nav { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-bottom: 10px; }
 .footer a { color: var(--ink-2); font-weight: 500; }
+/* رابط صغير للإدارة في آخر الصفحة — مش لافت للنظر عشان الزوار */
+.footer a.footer-admin { display: inline-flex; align-items: center; gap: 5px; margin-top: 14px; color: var(--ink-3); font-size: 12px; font-weight: 400; }
 
 .demo-bar { background: var(--panel); color: var(--lime); text-align: center; font-size: 13px; font-weight: 500; padding: 4px 12px; }
 .toast {

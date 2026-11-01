@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { BrandMark } from './Logo.jsx'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
-import { Home, Search, UserPlus, Megaphone, MapPin, ChevronDown, Moon, Sun } from 'lucide-react'
+import { Home, Search, UserPlus, Megaphone, MapPin, ChevronDown, Moon, Sun, Lock } from 'lucide-react'
 import { useAppState } from '../lib/app-state.jsx'
 import { LocationSheet } from './LocationSheet.jsx'
 import { InstallPrompt } from './InstallPrompt.jsx'
@@ -100,6 +100,9 @@ export function Layout() {
           <p>
             {SITE.name} منصة مجانية بتوصّل الناس ببعض بس. الاتفاق والدفع بيكون بينك وبين مقدم الخدمة مباشرة.
           </p>
+          <Link to="/admin" className="footer-admin">
+            <Lock size={13} /> دخول الإدارة
+          </Link>
         </footer>
       </main>
 
