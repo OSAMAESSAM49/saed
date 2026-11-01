@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ArrowUpLeft, MapPin, Check } from 'lucide-react'
+import { ArrowUpLeft, MapPin } from 'lucide-react'
 import { useAppState, useAsync, useSeo } from '../lib/app-state.jsx'
 import { getStats, searchProviders } from '../lib/api.js'
 import { arNum } from '../lib/arabic.js'
@@ -9,15 +9,28 @@ import { ProviderTile } from '../components/ProviderCard.jsx'
 import { AdSlot } from '../components/AdSlot.jsx'
 import { SITE } from '../config.js'
 
-function StatTile({ label, value, lime }) {
-  return (
-    <div className={`stat-tile ${lime ? 'lime' : ''}`}>
+// كل مربع بيفتح النتايج بتاعته (أو ينزل لقايمة الخدمات)
+function StatTile({ label, value, lime, to, onClick }) {
+  const body = (
+    <>
       <span>
-        <i>{lime && <Check size={12} strokeWidth={3} />}</i>
         {label}
+        <i>
+          <ArrowUpLeft size={15} />
+        </i>
       </span>
       <b>{value == null ? '—' : arNum(value)}</b>
-    </div>
+    </>
+  )
+  const cls = `stat-tile ${lime ? 'lime' : ''}`
+  return onClick ? (
+    <button type="button" onClick={onClick} className={cls}>
+      {body}
+    </button>
+  ) : (
+    <Link to={to} className={cls}>
+      {body}
+    </Link>
   )
 }
 
@@ -51,10 +64,10 @@ export default function Home() {
           <SearchBar dark />
         </div>
         <div className="hero-stats">
-          <StatTile label="مقدم خدمة" value={stats.data?.providers} lime />
-          <StatTile label="موثّق" value={stats.data?.verified} />
-          <StatTile label="خدمة نسائية" value={stats.data?.women} />
-          <StatTile label="نوع خدمة" value={catalog?.subcategories.length} />
+          <StatTile label="مقدم خدمة" value={stats.data?.providers} lime to="/search?all=1" />
+          <StatTile label="موثّق" value={stats.data?.verified} to="/search?verified=1" />
+          <StatTile label="خدمة نسائية" value={stats.data?.women} to="/search?women=1" />
+          <StatTile label="نوع خدمة" value={catalog?.subcategories.length} onClick={() => document.getElementById('cats')?.scrollIntoView({ block: 'start' })} />
         </div>
       </section>
 

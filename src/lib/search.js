@@ -38,7 +38,7 @@ export function governorateOf(locations, id) {
 
 export const servesFamily = (p, fam) => !fam || fam.has(p.home_location_id) || (p.area_ids || []).some((a) => fam.has(a))
 
-export function filterProviders(list, catalog, { location, category, sub, women, q, sort = 'best', limit = 60, offset = 0 } = {}) {
+export function filterProviders(list, catalog, { location, category, sub, women, verified, q, sort = 'best', limit = 60, offset = 0 } = {}) {
   const fam = locationFamily(catalog.locations, location)
   const { subcategories: subs, categories: cats } = catalog
   const nq = normalizeAr(q || '')
@@ -49,6 +49,7 @@ export function filterProviders(list, catalog, { location, category, sub, women,
 
   const out = list.filter((p) => {
     if (women && !p.women_service) return false
+    if (verified && !p.is_verified) return false
     if (!servesFamily(p, fam)) return false
     const mySubs = subs.filter((s) => p.service_ids.includes(s.id))
     if (category) {

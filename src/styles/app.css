@@ -196,8 +196,15 @@ p { margin: 0; }
   position: relative; display: flex; flex-direction: column; justify-content: space-between; min-height: 104px;
   padding: 14px 14px 10px; border-radius: 22px; background: var(--panel-2); color: var(--panel-ink);
 }
-.stat-tile span { display: flex; align-items: center; gap: 8px; color: var(--panel-ink-2); font-size: 14px; font-weight: 500; }
-.stat-tile span i { width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid currentColor; display: grid; place-items: center; }
+.stat-tile span { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--panel-ink-2); font-size: 14px; font-weight: 500; }
+.stat-tile span i { width: 28px; height: 28px; border-radius: 50%; border: 1px solid currentColor; display: grid; place-items: center; opacity: 0.8; transition: transform 0.15s; }
+/* عنوان «اختار الخدمة» مايستخباش تحت الهيدر لما مربع «نوع خدمة» ينزل له */
+#cats { scroll-margin-top: 96px; }
+button.stat-tile { border: 0; font: inherit; text-align: start; cursor: pointer; width: 100%; }
+.stat-tile { text-decoration: none; transition: background 0.15s, transform 0.1s; }
+.stat-tile:hover span i { transform: translate(-2px, -2px); }
+.stat-tile:active { transform: scale(0.98); }
+.stat-tile:not(.lime):hover { background: color-mix(in srgb, var(--panel-2) 85%, #fff); }
 .stat-tile b { font-size: 38px; font-weight: 500; line-height: 1.1; text-align: end; }
 .stat-tile.lime { background: var(--lime); color: #0b0b0c; }
 .stat-tile.lime span { color: rgba(11, 11, 12, 0.6); }
